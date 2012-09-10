@@ -1,0 +1,23 @@
+=== September 10, 2012 ===
+Project Notes
+-------------
+This script outputs the difference between text files based on comparison of lines in each.
+Funtionally it allows the specification truth operations 'and', 'or', and 'not' to text files comparisons.
+
+Syntax:
+STATEMENT: ( EXPRESSION ) OPERATOR ( EXPRESSION )
+EXPRESSION: FILE OPERATOR FILE
+OPERATOR: and, or, not
+FILE: text file name
+
+Instructions for Running:
+Example: echo "file1.txt or file2.txt" | diff.pl would output the contents of both files.
+Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match both files.
+         echo "file1.txt not file2.txt" | diff.pl outputs lines from file1.txt that are not in file2.txt
+
+Repository Information:
+This product is under version control using Git.
+
+Dependencies:
+
+Known Issues:
