@@ -1,12 +1,17 @@
 #!/usr/bin/perl -w
-###########################################################################
-# Purpose: Diff files with logical operators.
+#################################################################################################
+# Purpose: Diff files with logical operators. The script returns a minimized list of differences 
+#          that is the returned list is sorted (alpha-numerically), without 
+#          duplicates.
 # Method:  Use reduced boolean algerbra set to diff files.
+#
+# TODO:    This script does not respect operator precedence (not, and, or) ordering yet
+#          and has not implemented parenthesis yet. 
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
 # Rev:     0.0 - Dev.
-###########################################################################
+###################################################################################################
 
 use strict;
 use warnings;
