@@ -19,9 +19,6 @@ use vars qw/ %opt /;
 use Getopt::Std;
 use Switch;
 
-my @LHS      = ();
-my @RHS      = ();
-
 #
 # Message about this program and how to use it
 #
@@ -54,8 +51,15 @@ sub init
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 	my $sentence = <>;
-	parse( $sentence );
+	# legal tokens are '(', ')', 'and', 'or', 'not', <file name>.
+	my @tokens   = split( /\s/, $sentence );
+	my $lhs = parse( @tokens );
+	for my $result ( sort keys %$lhs )
+	{
+		print "$result\n" if ( $result );
+	}
 }
+
 init();
 
 # Returns a list of items anded from LHS and RHS.
@@ -63,16 +67,17 @@ init();
 # return: list of items.
 sub sOr
 {
+	my ( $tmp_lhs, $tmp_rhs ) = @_;
 	my $tmp;
-	while ( @RHS )
+	for my $key ( keys %$tmp_lhs )
 	{
-		$tmp->{ shift( @RHS ) } = 1;
+		$tmp->{ $key } = 1;
 	}
-	while ( @LHS )
+	for my $key ( keys %$tmp_rhs )
 	{
-		$tmp->{ shift( @LHS ) } = 1;
+		$tmp->{ $key } = 1;
 	}
-	return keys %$tmp;
+	return $tmp;
 }
 
 # Returns a list of uniq items that are in LHS or RHS.
@@ -80,22 +85,13 @@ sub sOr
 # return: list of items.
 sub sAnd
 {
-	my $tmp_lhs;
-	my $tmp_rhs;
-	my @tmp = ();
-	while ( @RHS )
-	{
-		$tmp_rhs->{ shift( @RHS ) } = 1;
-	}
-	while ( @LHS )
-	{
-		$tmp_lhs->{ shift( @LHS ) } = 1;
-	}
+	my ( $tmp_lhs, $tmp_rhs ) = @_;
+	my $tmp;
 	for my $key ( keys %$tmp_lhs )
 	{
-		push ( @tmp, $key ) if ( $tmp_lhs->{$key} and $tmp_rhs->{$key} );
+		$tmp->{ $key } = 1 if ( $tmp_lhs->{ $key } and $tmp_rhs->{ $key } );
 	}
-	return @tmp;
+	return $tmp;
 }
 
 # Could have named this better, but returns a list of items from LHS that are not in RHS
@@ -103,22 +99,13 @@ sub sAnd
 # return: list of items.
 sub sNot
 {
-	my $tmp_rhs;
-	my $tmp_lhs;
-	my @tmp = ();
-	while ( @RHS )
-	{
-		$tmp_rhs->{ shift( @RHS ) } = 1;
-	}
-	while ( @LHS )
-	{
-		$tmp_lhs->{ shift( @LHS ) } = 1;
-	}
+	my ( $tmp_lhs, $tmp_rhs ) = @_;
+	my $tmp;
 	for my $key ( keys %$tmp_lhs )
 	{
-		push ( @tmp, $key ) if ( not $tmp_rhs->{$key} );
+		$tmp->{ $key } = 1 if ( not $tmp_rhs->{ $key } );
 	}
-	return @tmp;
+	return $tmp;
 }
 
 #
@@ -127,14 +114,17 @@ sub sNot
 # return: list after the operation has completed.
 sub doOperation
 {
-	my ( $operation ) = @_;
-	print "LHS         RHS\n" if ( $opt{'d'} );
-	print "@LHS  $operation  @RHS\n" if ( $opt{'d'} );
+	my ( $lhs, $operation, $rhs ) = @_;
+	if ( keys %$lhs == 0 or keys %$rhs == 0 )
+	{
+		print STDERR "can't complete operation; missing right hand value of operator '$operation'\n";
+		exit( 0 );
+	}
 	switch ( $operation )
 	{
-		case "NOT" { return sNot( ); }
-		case "AND" { return sAnd( ); }
-		case "OR"  { return sOr( ); }
+		case "NOT" { return sNot( $lhs, $rhs ); }
+		case "AND" { return sAnd( $lhs, $rhs ); }
+		case "OR"  { return sOr( $lhs, $rhs ); }
 		else
 		{
 			print STDERR "Unknown operation '$operation'\n";
@@ -158,25 +148,30 @@ sub doOperation
 sub parse
 {
 	# legal tokens are '(', ')', 'and', 'or', 'not', <file name>.
-	my @tokens   = split( /\s/, $_[0] );
+	my @tokens   = @_;
 	my $operator = "";
-	while (@tokens)
+	my $lhs;
+	my $rhs;
+	while ( @tokens )
 	{
 		my $token = shift( @tokens );
 		if ( $token eq "or" ) # only on FILE or after CLOSE_PAREN
 		{
 			print "or: '$token'\n" if ( $opt{'d'} );
 			$operator = "OR";
+			next;
 		}
 		elsif ( $token eq "and" ) # only on FILE or after CLOSE_PAREN
 		{
 			print "and: '$token'\n" if ( $opt{'d'} );
-			$operator = "AND"; 
+			$operator = "AND";
+			next;
 		}
 		elsif ( $token eq "not" ) # only on FILE or after CLOSE_PAREN
 		{
 			print "not: '$token'\n" if ( $opt{'d'} );
 			$operator = "NOT";
+			next;
 		}
 		# elsif ( $token eq "(" ) # only on INIT or after OPERATOR
 		# {
@@ -186,23 +181,32 @@ sub parse
 		# elsif ( $token eq ")" ) # can only follow FILE
 		# {
 			# print "): '$token'\n" if ( $opt{'d'} );
-			# @LHS = doOperation( $operation, @LHS, @RHS );
+			# $lhs = doOperation( $lhs, $operation, $rhs );
 		# }
 		elsif ( -T $token ) # the token looks like a text file.
 		{
 			print "file: '$token'\n" if ( $opt{'d'} );
 			open( FILE_IN, "<$token" ) or die "Error reading '$token': $!\n";
-			if ( not @LHS )
+			if ( keys %$lhs == 0 )
 			{
-				@LHS = <FILE_IN>;
+				while ( <FILE_IN> )
+				{
+					chomp;
+					$lhs->{ $_ } = 1;
+				}
 				close( FILE_IN );
-				chomp( @LHS );
 				next;
+			} # else fill the rh side hash ref.
+			else
+			{
+				while ( <FILE_IN> )
+				{
+					chomp;
+					$rhs->{ $_ } = 1;
+				}
+				close( FILE_IN );
+				return doOperation( $lhs, $operator, $rhs );
 			}
-			@RHS = <FILE_IN>;
-			close( FILE_IN );
-			chomp( @RHS );
-			@LHS = doOperation( $operator );
 		}
 		else
 		{
@@ -210,11 +214,8 @@ sub parse
 			exit( 0 );
 		}
 	}
-	
-	foreach my $result ( sort @LHS )
-	{
-		print "$result\n" if ( $result );
-	}
+	print STDERR "Syntax error: incomplete expression '@tokens'\n";
+	exit( 0 );
 }
 
 1;
