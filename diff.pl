@@ -56,23 +56,16 @@ init();
 # Returns a list of items anded from LHS and RHS.
 # param:  
 # return: list of items.
-sub sAnd
+sub sOr
 {
 	my $tmp;
 	while ( @RHS )
 	{
-		my $value = shift( @RHS );
-		foreach my $test ( @LHS )
-		{
-			if ( $test ne $value )
-			{
-				next;
-			}
-			else
-			{
-				$tmp->{$value} = 1;
-			}
-		}
+		$tmp->{ shift( @RHS ) } = 1;
+	}
+	while ( @LHS )
+	{
+		$tmp->{ shift( @LHS ) } = 1;
 	}
 	return keys %$tmp;
 }
@@ -80,10 +73,24 @@ sub sAnd
 # Returns a list of uniq items that are in LHS or RHS.
 # param:  
 # return: list of items.
-sub sOr
+sub sAnd
 {
-	
-	return ();
+	my $tmp_lhs;
+	my $tmp_rhs;
+	my @tmp = ();
+	while ( @RHS )
+	{
+		$tmp_rhs->{ shift( @RHS ) } = 1;
+	}
+	while ( @LHS )
+	{
+		$tmp_lhs->{ shift( @LHS ) } = 1;
+	}
+	for my $key ( keys %$tmp_lhs )
+	{
+		push ( @tmp, $key ) if ( $tmp_lhs->{$key} and $tmp_rhs->{$key} );
+	}
+	return @tmp;
 }
 
 # Could have named this better, but returns a list of items from LHS that are not in RHS
@@ -91,25 +98,22 @@ sub sOr
 # return: list of items.
 sub sNot
 {
-	my $tmp;
+	my $tmp_rhs;
+	my $tmp_lhs;
+	my @tmp = ();
 	while ( @RHS )
 	{
-		my $value = shift( @RHS );
-		foreach my $test ( @LHS )
-		{
-			if ( $test eq $value )
-			{
-				next;
-			}
-			else
-			{
-				print "$test ne $value";
-				$tmp->{$test} = 1;
-				last;
-			}
-		}
+		$tmp_rhs->{ shift( @RHS ) } = 1;
 	}
-	return keys %$tmp;
+	while ( @LHS )
+	{
+		$tmp_lhs->{ shift( @LHS ) } = 1;
+	}
+	for my $key ( keys %$tmp_lhs )
+	{
+		push ( @tmp, $key ) if ( not $tmp_rhs->{$key} );
+	}
+	return @tmp;
 }
 
 #
@@ -119,7 +123,8 @@ sub sNot
 sub doOperation
 {
 	my ( $operation ) = @_;
-	print "operation: '$operation'    LHS=\n @LHS     RHS=\n @RHS" if ( $opt{'d'} );
+	print "LHS         RHS\n" if ( $opt{'d'} );
+	print "@LHS  $operation  @RHS\n" if ( $opt{'d'} );
 	switch ( $operation )
 	{
 		case "NOT" { return sNot( ); }
@@ -186,10 +191,12 @@ sub parse
 			{
 				@LHS = <FILE_IN>;
 				close( FILE_IN );
+				chomp( @LHS );
 				next;
 			}
 			@RHS = <FILE_IN>;
 			close( FILE_IN );
+			chomp( @RHS );
 			@LHS = doOperation( $operator );
 		}
 		else
@@ -199,10 +206,9 @@ sub parse
 		}
 	}
 	
-
-	foreach my $result ( @LHS )
+	foreach my $result ( sort @LHS )
 	{
-		print "$result" if ( $result );
+		print "$result\n" if ( $result );
 	}
 }
 
