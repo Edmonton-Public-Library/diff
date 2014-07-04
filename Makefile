@@ -6,8 +6,6 @@ LOCAL=~/projects/diff/
 APP=diff.pl
 
 put: test
-	#scp ${LOCAL}${APP} ${USER}@${SERVER}:${REMOTE}
-get:
-	scp ${USER}@${SERVER}:${REMOTE}${APP} ${LOCAL}
-test:
+	scp ${LOCAL}${APP} ${USER}@${SERVER}:${REMOTE}
+test: ${LOCAL}${APP}
 	perl -c ${LOCAL}${APP}

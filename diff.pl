@@ -10,6 +10,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.1 - Added trim function for removing end of line whitespace.
 # Rev:     0.0 - Dev.
 ###################################################################################################
 
@@ -58,6 +59,18 @@ sub init
 	{
 		print "$result\n" if ( $result );
 	}
+}
+
+#
+# Trim function to remove whitespace from the start and end of the string.
+# param:  string to trim.
+# return: string without leading or trailing spaces.
+sub trim($)
+{
+	my $string = shift;
+	$string =~ s/^\s+//;
+	$string =~ s/\s+$//;
+	return $string;
 }
 
 init();
@@ -191,8 +204,8 @@ sub parse
 			{
 				while ( <FILE_IN> )
 				{
-					chomp;
-					$lhs->{ $_ } = 1;
+					my $line = trim( $_ ); #chomp;
+					$lhs->{ $line } = 1;
 				}
 				close( FILE_IN );
 				next;
@@ -201,8 +214,8 @@ sub parse
 			{
 				while ( <FILE_IN> )
 				{
-					chomp;
-					$rhs->{ $_ } = 1;
+					my $line = trim( $_ ); #chomp;
+					$rhs->{ $line } = 1;
 				}
 				close( FILE_IN );
 				return doOperation( $lhs, $operator, $rhs );
