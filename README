@@ -12,8 +12,11 @@ FILE: text file name
 
 Instructions for Running:
 Example: echo "file1.txt or file2.txt" | diff.pl would output the contents of both files.
-Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match both files.
+Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match in both files.
          echo "file1.txt not file2.txt" | diff.pl outputs lines from file1.txt that are not in file2.txt
+		 
+diff.pl reads both files and orders the contents in alpha-numeric order, then compares the two lists.
+White space is always ignored at the start and end of the lines being compared.
 
 Repository Information:
 This product is under version control using Git.
