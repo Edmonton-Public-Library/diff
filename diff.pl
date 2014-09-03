@@ -29,6 +29,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.2 - Added selectable columns from second file.
 # Rev:     0.1 - Added trim function for removing end of line whitespace.
 # Rev:     0.0 - Dev.
 ###################################################################################################
@@ -37,7 +38,9 @@ use strict;
 use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
-use Switch;
+
+my $VERSION        = "0.2";
+my @COLUMNS_WANTED = ();
 
 #
 # Message about this program and how to use it
@@ -46,18 +49,23 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-x]
+	usage: [echo "f1.txt <operator> f2.txt" |] $0 [-xdiot] [-f<c0,c1,...,cn>]
 This script allows the user to specify differences in files by boolean algerbra.
 Example: echo "file1.txt or file2.txt" | diff.pl would output the contents of both files.
 Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match both files.
          echo "file1.txt not file2.txt" | diff.pl outputs lines from file1.txt that are not in file2.txt
- -d: Print debug information.
- -i: Ignore letter casing.
- -o: Order all input file contents first.
- -x: This (help) message.
+ -d            : Print debug information.
+ -i            : Ignore letter casing.
+ -f[c1,c2,c3,...cn]: Columns from file 2 to be ignored on comparison. If the columns doesn't exist it is ignored.
+ -o            : Order all input file contents first.
+ -t            : Force a trailing delimiter or '|' at the end of the line when -f is used.
+ -x            : This (help) message.
 
 example: $0 -x
-
+example: echo "file1.lst and file2.lst" | $0 -fc2,c3,c4 
+         which would report the difference of file1.lst and file2.lst, ignoreing values in file2.lst in 
+         columns 2,3, and 4 (if present).
+Version: $VERSION
 EOF
     exit;
 }
@@ -67,11 +75,33 @@ EOF
 # return: 
 sub init
 {
-    my $opt_string = 'diox';
+    my $opt_string = 'df:iotx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
+	if ( $opt{'f'} )
+	{
+		# Since we can't split if there is no delimiter character, let's introduce one if there isn't one.
+		$opt{'f'} .= "," if ( $opt{'f'} !~ m/,/ );
+		my @cols = split( ',', $opt{'f'} );
+		foreach my $colNum ( @cols )
+		{
+			# Columns are designated with 'c' prefix to get over the problem of perl not recognizing 
+			# '0' as a legitimate column number.
+			if ( $colNum =~ m/c\d{1,}/ )
+			{
+				$colNum =~ s/c//; # get rid of the 'c' because it causes problems later.
+				push( @COLUMNS_WANTED, trim($colNum) );
+			}
+		}
+		if ( scalar @COLUMNS_WANTED == 0 )
+		{
+			print STDERR "**Error, '-f' flag used but no valid columns selected.\n";
+			usage();
+		}
+	}
+	print STDERR "columns requested from second file: '@COLUMNS_WANTED'\n" if ( $opt{'d'} and $opt{'f'} );
 	my $sentence = <>;
-	# legal tokens are '(', ')', 'and', 'or', 'not', <file name>.
+	# legal tokens are 'and', 'or', 'not', 'AND', 'OR', or 'NOT' <file name>.
 	my @tokens   = split( /\s/, $sentence );
 	my $lhs = parse( @tokens );
 	for my $result ( sort keys %$lhs )
@@ -152,19 +182,31 @@ sub doOperation
 		print STDERR "can't complete operation; missing right hand value of operator '$operation'\n";
 		exit( 0 );
 	}
-	switch ( $operation )
-	{
-		case "NOT" { return sNot( $lhs, $rhs ); }
-		case "AND" { return sAnd( $lhs, $rhs ); }
-		case "OR"  { return sOr( $lhs, $rhs ); }
-		else
-		{
-			print STDERR "Unknown operation '$operation'\n";
-			exit( 0 );
-		}
-	}
+	return sNot( $lhs, $rhs ) if ( $operation eq "NOT");
+	return sAnd( $lhs, $rhs ) if ( $operation eq "AND");
+	return sOr( $lhs, $rhs )  if ( $operation eq "OR" );
+	print STDERR "Unknown operation '$operation'\n";
+	exit( 0 );
 }
 
+#
+# param:  line to pull out columns from.
+# return: string line with requested columns removed.
+sub getColumns( $ )
+{
+	my $line = shift;
+	my @columns = split( '\|', $line );
+	return $line if ( scalar( @columns ) < 2 );
+	my @newLine = ();
+	foreach my $i ( @COLUMNS_WANTED )
+	{
+		push( @newLine, $columns[ $i ] ) if ( defined $columns[ $i ] and exists $columns[ $i ] );
+	}
+	$line = join( '|', @newLine );
+	$line .= "|" if ( $opt{'t'} );
+	print STDERR ">$line<, " if ( $opt{'d'} );
+	return $line;
+}
 
 #
 # Parses the grammer of the input line.
@@ -187,21 +229,21 @@ sub parse
 	while ( @tokens )
 	{
 		my $token = shift( @tokens );
-		if ( $token eq "or" ) # only on FILE or after CLOSE_PAREN
+		if ( $token eq "or" or $token eq "OR" ) # only on FILE or after CLOSE_PAREN
 		{
-			print "or: '$token'\n" if ( $opt{'d'} );
+			print STDERR "or: '$token'\n" if ( $opt{'d'} );
 			$operator = "OR";
 			next;
 		}
-		elsif ( $token eq "and" ) # only on FILE or after CLOSE_PAREN
+		elsif ( $token eq "and" or $token eq "AND" ) # only on FILE or after CLOSE_PAREN
 		{
-			print "and: '$token'\n" if ( $opt{'d'} );
+			print STDERR "and: '$token'\n" if ( $opt{'d'} );
 			$operator = "AND";
 			next;
 		}
-		elsif ( $token eq "not" ) # only on FILE or after CLOSE_PAREN
+		elsif ( $token eq "not" or $token eq "NOT" ) # only on FILE or after CLOSE_PAREN
 		{
-			print "not: '$token'\n" if ( $opt{'d'} );
+			print STDERR "not: '$token'\n" if ( $opt{'d'} );
 			$operator = "NOT";
 			next;
 		}
@@ -217,7 +259,7 @@ sub parse
 		# }
 		elsif ( -T $token ) # the token looks like a text file.
 		{
-			print "file: '$token'\n" if ( $opt{'d'} );
+			print STDERR "file: '$token'\n" if ( $opt{'d'} );
 			open( FILE_IN, "<$token" ) or die "Error reading '$token': $!\n";
 			if ( keys %$lhs == 0 )
 			{
@@ -228,12 +270,13 @@ sub parse
 				}
 				close( FILE_IN );
 				next;
-			} # else fill the rh side hash ref.
-			else
+			} 
+			else # else fill the rh side hash ref.
 			{
 				while ( <FILE_IN> )
 				{
 					my $line = trim( $_ ); #chomp;
+					$line = getColumns( $line ) if ( $opt{'f'} );
 					$rhs->{ $line } = 1;
 				}
 				close( FILE_IN );
@@ -250,4 +293,4 @@ sub parse
 	exit( 0 );
 }
 
-1;
+# EOF
