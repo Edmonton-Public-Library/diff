@@ -29,6 +29,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.3 - Updated comments in usage().
 # Rev:     0.2 - Added selectable columns from second file.
 # Rev:     0.1 - Added trim function for removing end of line whitespace.
 # Rev:     0.0 - Dev.
@@ -39,7 +40,7 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION        = "0.2";
+my $VERSION        = "0.3";
 my @COLUMNS_WANTED = ();
 
 #
@@ -50,21 +51,22 @@ sub usage()
     print STDERR << "EOF";
 
 	usage: [echo "f1.txt <operator> f2.txt" |] $0 [-xdiot] [-f<c0,c1,...,cn>]
-This script allows the user to specify differences in files by boolean algerbra.
-Example: echo "file1.txt or file2.txt" | diff.pl would output the contents of both files.
+This script allows the user to specify differences in files by boolean algerbra. 
+Note: '-f' uses 0-based column indexing. Example: a|b|c 'a' is column 0, 'b' is column 1.
+Example: echo "file1.txt or  file2.txt" | diff.pl would output the contents of both files.
 Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match both files.
          echo "file1.txt not file2.txt" | diff.pl outputs lines from file1.txt that are not in file2.txt
- -d            : Print debug information.
- -i            : Ignore letter casing.
- -f[c1,c2,c3,...cn]: Columns from file 2 to be ignored on comparison. If the columns doesn't exist it is ignored.
- -o            : Order all input file contents first.
- -t            : Force a trailing delimiter or '|' at the end of the line when -f is used.
- -x            : This (help) message.
+ -d             : Print debug information.
+ -i             : Ignore letter casing.
+ -f[c0,c1,...cn]: Columns from file 2 to be ignored on comparison. If the columns doesn't exist it is ignored.
+ -o             : Order all input file contents first.
+ -t             : Force a trailing delimiter or '|' at the end of the line when -f is used.
+ -x             : This (help) message.
 
 example: $0 -x
 example: echo "file1.lst and file2.lst" | $0 -fc2,c3,c4 
          which would report the difference of file1.lst and file2.lst, ignoreing values in file2.lst in 
-         columns 2,3, and 4 (if present).
+         columns 2,3, and 4 (if present, and ignored if not).
 Version: $VERSION
 EOF
     exit;
