@@ -29,6 +29,8 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.6 - Add selection of fields from file 1 too.
+# Rev:     0.5 - Updated comments in usage().
 # Rev:     0.4 - Updated comments in usage().
 # Rev:     0.3 - Updated comments in usage().
 # Rev:     0.2 - Added selectable columns from second file.
@@ -41,8 +43,9 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION        = "0.4";
-my @COLUMNS_WANTED = ();
+my $VERSION            = "0.6";
+my @COLUMNS_WANTED_TOO = ();
+my @COLUMNS_WANTED_ONE = ();
 
 #
 # Message about this program and how to use it
@@ -59,6 +62,7 @@ Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match 
          echo "file1.txt not file2.txt" | diff.pl outputs lines from file1.txt that are not in file2.txt
  -d             : Print debug information.
  -i             : Ignore letter casing.
+ -e[c0,c1,...cn]: Columns from file 1 used in comparison. If the columns doesn't exist it is ignored.
  -f[c0,c1,...cn]: Columns from file 2 used in comparison. If the columns doesn't exist it is ignored.
  -o             : Order all input file contents first.
  -t             : Force a trailing delimiter or '|' at the end of the line when -f is used.
@@ -66,8 +70,10 @@ Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match 
 
 example: $0 -x
 example: echo "file1.lst and file2.lst" | $0 -fc2,c3,c4 
-         which would report the difference of file1.lst and file2.lst, ignoreing values in file2.lst in 
+         which would report the difference of file1.lst and file2.lst, using values in file2.lst in 
          columns 2,3, and 4 (if present, and ignored if not).
+example: echo "f1.lst not f2.lst" | $0 -it -fc1 -ec0
+         Reports the values not in file 2 based on comparison of column 0 of file 1 and column 1 of file 2.
 Version: $VERSION
 EOF
     exit;
@@ -78,9 +84,31 @@ EOF
 # return: 
 sub init
 {
-    my $opt_string = 'df:iotx';
+    my $opt_string = 'de:f:iotx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
+	if ( $opt{'e'} )
+	{
+		# Since we can't split if there is no delimiter character, let's introduce one if there isn't one.
+		$opt{'e'} .= "," if ( $opt{'e'} !~ m/,/ );
+		my @cols = split( ',', $opt{'e'} );
+		foreach my $colNum ( @cols )
+		{
+			# Columns are designated with 'c' prefix to get over the problem of perl not recognizing 
+			# '0' as a legitimate column number.
+			if ( $colNum =~ m/c\d{1,}/ )
+			{
+				$colNum =~ s/c//; # get rid of the 'c' because it causes problems later.
+				push( @COLUMNS_WANTED_ONE, trim($colNum) );
+			}
+		}
+		if ( scalar @COLUMNS_WANTED_ONE == 0 )
+		{
+			print STDERR "**Error, '-e' flag used but no valid columns selected.\n";
+			usage();
+		}
+	}
+	print STDERR "columns requested from first file: '@COLUMNS_WANTED_ONE'\n" if ( $opt{'d'} and $opt{'e'} );
 	if ( $opt{'f'} )
 	{
 		# Since we can't split if there is no delimiter character, let's introduce one if there isn't one.
@@ -93,16 +121,16 @@ sub init
 			if ( $colNum =~ m/c\d{1,}/ )
 			{
 				$colNum =~ s/c//; # get rid of the 'c' because it causes problems later.
-				push( @COLUMNS_WANTED, trim($colNum) );
+				push( @COLUMNS_WANTED_TOO, trim($colNum) );
 			}
 		}
-		if ( scalar @COLUMNS_WANTED == 0 )
+		if ( scalar @COLUMNS_WANTED_TOO == 0 )
 		{
 			print STDERR "**Error, '-f' flag used but no valid columns selected.\n";
 			usage();
 		}
 	}
-	print STDERR "columns requested from second file: '@COLUMNS_WANTED'\n" if ( $opt{'d'} and $opt{'f'} );
+	print STDERR "columns requested from second file: '@COLUMNS_WANTED_TOO'\n" if ( $opt{'d'} and $opt{'f'} );
 	my $sentence = <>;
 	# legal tokens are 'and', 'or', 'not', 'AND', 'OR', or 'NOT' <file name>.
 	my @tokens   = split( /\s/, $sentence );
@@ -194,14 +222,16 @@ sub doOperation
 
 #
 # param:  line to pull out columns from.
+# param:  columns wanted array, array of columns that are required.
 # return: string line with requested columns removed.
-sub getColumns( $ )
+sub getColumns
 {
 	my $line = shift;
+	my @wantedColumns = @_;
 	my @columns = split( '\|', $line );
 	return $line if ( scalar( @columns ) < 2 );
 	my @newLine = ();
-	foreach my $i ( @COLUMNS_WANTED )
+	foreach my $i ( @wantedColumns )
 	{
 		push( @newLine, $columns[ $i ] ) if ( defined $columns[ $i ] and exists $columns[ $i ] );
 	}
@@ -269,6 +299,7 @@ sub parse
 				while ( <FILE_IN> )
 				{
 					my $line = trim( $_ ); #chomp;
+					$line = getColumns( $line, @COLUMNS_WANTED_ONE ) if ( $opt{'e'} );
 					$lhs->{ $line } = 1;
 				}
 				close( FILE_IN );
@@ -279,7 +310,7 @@ sub parse
 				while ( <FILE_IN> )
 				{
 					my $line = trim( $_ ); #chomp;
-					$line = getColumns( $line ) if ( $opt{'f'} );
+					$line = getColumns( $line, @COLUMNS_WANTED_TOO ) if ( $opt{'f'} );
 					$rhs->{ $line } = 1;
 				}
 				close( FILE_IN );
