@@ -29,6 +29,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.4 - Updated comments in usage().
 # Rev:     0.3 - Updated comments in usage().
 # Rev:     0.2 - Added selectable columns from second file.
 # Rev:     0.1 - Added trim function for removing end of line whitespace.
@@ -40,7 +41,7 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION        = "0.3";
+my $VERSION        = "0.4";
 my @COLUMNS_WANTED = ();
 
 #
@@ -58,7 +59,7 @@ Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match 
          echo "file1.txt not file2.txt" | diff.pl outputs lines from file1.txt that are not in file2.txt
  -d             : Print debug information.
  -i             : Ignore letter casing.
- -f[c0,c1,...cn]: Columns from file 2 to be ignored on comparison. If the columns doesn't exist it is ignored.
+ -f[c0,c1,...cn]: Columns from file 2 used in comparison. If the columns doesn't exist it is ignored.
  -o             : Order all input file contents first.
  -t             : Force a trailing delimiter or '|' at the end of the line when -f is used.
  -x             : This (help) message.
