@@ -29,6 +29,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.7 - Output original line in its entirety.
 # Rev:     0.6 - Add selection of fields from file 1 too.
 # Rev:     0.5 - Updated comments in usage().
 # Rev:     0.4 - Updated comments in usage().
@@ -43,7 +44,7 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION            = "0.6";
+my $VERSION            = "0.7";
 my @COLUMNS_WANTED_TOO = ();
 my @COLUMNS_WANTED_ONE = ();
 
@@ -135,9 +136,9 @@ sub init
 	# legal tokens are 'and', 'or', 'not', 'AND', 'OR', or 'NOT' <file name>.
 	my @tokens   = split( /\s/, $sentence );
 	my $lhs = parse( @tokens );
-	for my $result ( sort keys %$lhs )
+	while( my ($key, $v) = each %$lhs )
 	{
-		print "$result\n" if ( $result );
+		print $v if ( defined $lhs->{$key} );
 	}
 }
 
@@ -161,14 +162,14 @@ init();
 sub sOr
 {
 	my ( $tmp_lhs, $tmp_rhs ) = @_;
-	my $tmp;
-	for my $key ( keys %$tmp_lhs )
+	my $tmp = {};
+	while( my ($key, $v) = each %$tmp_lhs )
 	{
-		$tmp->{ $key } = 1;
+		$tmp->{ $key } = $v;
 	}
-	for my $key ( keys %$tmp_rhs )
+	while( my ($key, $v) = each %$tmp_rhs )
 	{
-		$tmp->{ $key } = 1;
+		$tmp->{ $key } = $v;
 	}
 	return $tmp;
 }
@@ -179,10 +180,10 @@ sub sOr
 sub sAnd
 {
 	my ( $tmp_lhs, $tmp_rhs ) = @_;
-	my $tmp;
-	for my $key ( keys %$tmp_lhs )
+	my $tmp = {};
+	while( my ($key, $v) = each %$tmp_lhs )
 	{
-		$tmp->{ $key } = 1 if ( $tmp_lhs->{ $key } and $tmp_rhs->{ $key } );
+		$tmp->{ $key } = $v if ( $tmp_lhs->{ $key } and $tmp_rhs->{ $key } );
 	}
 	return $tmp;
 }
@@ -193,10 +194,10 @@ sub sAnd
 sub sNot
 {
 	my ( $tmp_lhs, $tmp_rhs ) = @_;
-	my $tmp;
-	for my $key ( keys %$tmp_lhs )
+	my $tmp = {};
+	while( my ($key, $v) = each %$tmp_lhs )
 	{
-		$tmp->{ $key } = 1 if ( not $tmp_rhs->{ $key } );
+		$tmp->{ $key } = $v if ( not $tmp_rhs->{ $key } );
 	}
 	return $tmp;
 }
@@ -300,7 +301,8 @@ sub parse
 				{
 					my $line = trim( $_ ); #chomp;
 					$line = getColumns( $line, @COLUMNS_WANTED_ONE ) if ( $opt{'e'} );
-					$lhs->{ $line } = 1;
+					$lhs->{ $line } = $_;
+					# $lhs->{ $line } = 1;
 				}
 				close( FILE_IN );
 				next;
@@ -311,7 +313,8 @@ sub parse
 				{
 					my $line = trim( $_ ); #chomp;
 					$line = getColumns( $line, @COLUMNS_WANTED_TOO ) if ( $opt{'f'} );
-					$rhs->{ $line } = 1;
+					$rhs->{ $line } = $_;
+					# $rhs->{ $line } = 1;
 				}
 				close( FILE_IN );
 				return doOperation( $lhs, $operator, $rhs );
