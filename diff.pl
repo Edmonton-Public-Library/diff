@@ -302,7 +302,6 @@ sub parse
 					my $line = trim( $_ ); #chomp;
 					$line = getColumns( $line, @COLUMNS_WANTED_ONE ) if ( $opt{'e'} );
 					$lhs->{ $line } = $_;
-					# $lhs->{ $line } = 1;
 				}
 				close( FILE_IN );
 				next;
@@ -314,7 +313,6 @@ sub parse
 					my $line = trim( $_ ); #chomp;
 					$line = getColumns( $line, @COLUMNS_WANTED_TOO ) if ( $opt{'f'} );
 					$rhs->{ $line } = $_;
-					# $rhs->{ $line } = 1;
 				}
 				close( FILE_IN );
 				return doOperation( $lhs, $operator, $rhs );
