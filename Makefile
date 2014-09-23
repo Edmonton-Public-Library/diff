@@ -1,7 +1,7 @@
 # copies most rescent files from eplapp for updating to git.
 SERVER=eplapp.library.ualberta.ca
 USER=sirsi
-REMOTE=~/Unicorn/EPLwork/anisbet/
+REMOTE=~/Unicorn/Bincustom/
 LOCAL=~/projects/diff/
 APP=diff.pl
 
