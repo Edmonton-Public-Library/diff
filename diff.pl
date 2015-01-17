@@ -29,6 +29,8 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.8 - Added -n to normalize fields before comparison. By normalize I mean
+#                remove all white spaces and convert case of any alpha characters.
 # Rev:     0.7 - Output original line in its entirety.
 # Rev:     0.6 - Add selection of fields from file 1 too.
 # Rev:     0.5 - Updated comments in usage().
@@ -44,7 +46,7 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION            = "0.7";
+my $VERSION            = "0.8";
 my @COLUMNS_WANTED_TOO = ();
 my @COLUMNS_WANTED_ONE = ();
 
@@ -65,6 +67,8 @@ Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match 
  -i             : Ignore letter casing.
  -e[c0,c1,...cn]: Columns from file 1 used in comparison. If the columns doesn't exist it is ignored.
  -f[c0,c1,...cn]: Columns from file 2 used in comparison. If the columns doesn't exist it is ignored.
+ -n             : Normalize fields before comparison, that is, remove all white space and make upper case.
+                  ie: 'n  123A7000   ' becomes 'N123A7000'.
  -o             : Order all input file contents first.
  -t             : Force a trailing delimiter or '|' at the end of the line when -f is used.
  -x             : This (help) message.
@@ -85,7 +89,7 @@ EOF
 # return: 
 sub init
 {
-    my $opt_string = 'de:f:iotx';
+    my $opt_string = 'de:f:inotx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 	if ( $opt{'e'} )
@@ -142,15 +146,29 @@ sub init
 	}
 }
 
+# Compression refers to removing white space and normalizing all
+# alphabetic characters into upper case.
+# param:  any string.
+# return: input string with spaces removed and in upper case.
+sub normalize( $ )
+{
+	my $line = shift;
+	$line =~ s/\s+//g;
+	$line = uc $line;
+	return $line;
+}
+
 #
-# Trim function to remove whitespace from the start and end of the string.
+# Trim function to remove white space from the start and end of the string.
+# This version also will normalize the string if '-n' flag is selected.
 # param:  string to trim.
 # return: string without leading or trailing spaces.
-sub trim($)
+sub trim( $ )
 {
 	my $string = shift;
 	$string =~ s/^\s+//;
 	$string =~ s/\s+$//;
+	$string = normalize( $string ) if ( $opt{'n'} );
 	return $string;
 }
 
