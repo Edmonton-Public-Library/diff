@@ -4,7 +4,7 @@
 #          that is the returned list is sorted (alpha-numerically), without 
 #          duplicates.
 # Compares two files using binary operators 'and', 'or', and 'not'.
-#    Copyright (C) 2014  Andrew Nisbet
+#    Copyright (C) 2015  Andrew Nisbet
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,6 +29,8 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.9 - Added -m to merge data from both matching lines on output -e, then -f in order.
+#                The matches are issued only once.
 # Rev:     0.8 - Added -n to normalize fields before comparison. By normalize I mean
 #                remove all white spaces and convert case of any alpha characters.
 # Rev:     0.7 - Output original line in its entirety.
@@ -46,9 +48,10 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION            = "0.8";
+my $VERSION            = "0.9";
 my @COLUMNS_WANTED_TOO = ();
 my @COLUMNS_WANTED_ONE = ();
+my @COLUMNS_MERGE      = (); # Desired columns to be merged when file 1 and file 2 match.
 
 #
 # Message about this program and how to use it
@@ -57,7 +60,7 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: [echo "f1.txt <operator> f2.txt" |] $0 [-xdiot] [-f<c0,c1,...,cn>]
+	usage: [echo "f1.txt <operator> f2.txt" |] $0 [-xdiot] [-e<c0,c1,...,cn> [-f<c0,c1,...,cn>]] [-m<c0,c1,...,cn>]
 This script allows the user to specify differences in files by boolean algerbra. 
 Note: '-f' uses 0-based column indexing. Example: a|b|c 'a' is column 0, 'b' is column 1.
 Example: echo "file1.txt or  file2.txt" | diff.pl would output the contents of both files.
@@ -67,6 +70,8 @@ Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match 
  -i             : Ignore letter casing.
  -e[c0,c1,...cn]: Columns from file 1 used in comparison. If the columns doesn't exist it is ignored.
  -f[c0,c1,...cn]: Columns from file 2 used in comparison. If the columns doesn't exist it is ignored.
+ -m[c0,c1,...cn]: Merge specified columns from file 2 where diff matches file 1 AND file 2.
+                  works on 'AND' operations, since you cannot merge fields that don't match.
  -n             : Normalize fields before comparison, that is, remove all white space and make upper case.
                   ie: 'n  123A7000   ' becomes 'N123A7000'.
  -o             : Order all input file contents first.
@@ -79,6 +84,15 @@ example: echo "file1.lst and file2.lst" | $0 -fc2,c3,c4
          columns 2,3, and 4 (if present, and ignored if not).
 example: echo "f1.lst not f2.lst" | $0 -it -fc1 -ec0
          Reports the values not in file 2 based on comparison of column 0 of file 1 and column 1 of file 2.
+
+example: Consider two files m1 and m2, where the contents of m1 reads:
+12345|DVD|3|
+11111|CD|5|
+         and m2 reads:
+11111|CD|24|
+         echo "m1 and m2" | $0 -ec0,c1 -fc0,c1 -mc2 
+        Produces:
+11111|CD|5|24|
 Version: $VERSION
 EOF
     exit;
@@ -89,7 +103,7 @@ EOF
 # return: 
 sub init
 {
-    my $opt_string = 'de:f:inotx';
+    my $opt_string = 'de:f:im:notx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 	if ( $opt{'e'} )
@@ -107,13 +121,14 @@ sub init
 				push( @COLUMNS_WANTED_ONE, trim($colNum) );
 			}
 		}
-		if ( scalar @COLUMNS_WANTED_ONE == 0 )
+		if ( scalar(@COLUMNS_WANTED_ONE) == 0 )
 		{
-			print STDERR "**Error, '-e' flag used but no valid columns selected.\n";
+			print STDERR "***Error, '-e' flag used but no valid columns selected.\n";
 			usage();
 		}
+		print STDERR "columns requested from first file: '@COLUMNS_WANTED_ONE'\n" if ( $opt{'d'} and $opt{'e'} );
 	}
-	print STDERR "columns requested from first file: '@COLUMNS_WANTED_ONE'\n" if ( $opt{'d'} and $opt{'e'} );
+	
 	if ( $opt{'f'} )
 	{
 		# Since we can't split if there is no delimiter character, let's introduce one if there isn't one.
@@ -131,11 +146,35 @@ sub init
 		}
 		if ( scalar @COLUMNS_WANTED_TOO == 0 )
 		{
-			print STDERR "**Error, '-f' flag used but no valid columns selected.\n";
+			print STDERR "***Error, '-f' flag used but no valid columns selected.\n";
 			usage();
 		}
+		print STDERR "columns requested from second file: '@COLUMNS_WANTED_TOO'\n" if ( $opt{'d'} and $opt{'f'} );
 	}
-	print STDERR "columns requested from second file: '@COLUMNS_WANTED_TOO'\n" if ( $opt{'d'} and $opt{'f'} );
+	
+	if ( $opt{'m'} )
+	{
+		# Since we can't split if there is no delimiter character, let's introduce one if there isn't one.
+		$opt{'m'} .= "," if ( $opt{'m'} !~ m/,/ );
+		my @cols = split( ',', $opt{'m'} );
+		foreach my $colNum ( @cols )
+		{
+			# Columns are designated with 'c' prefix to get over the problem of perl not recognizing 
+			# '0' as a legitimate column number.
+			if ( $colNum =~ m/c\d{1,}/ )
+			{
+				$colNum =~ s/c//; # get rid of the 'c' because it causes problems later.
+				push( @COLUMNS_MERGE, trim($colNum) );
+			}
+		}
+		if ( scalar @COLUMNS_MERGE == 0 )
+		{
+			print STDERR "***Error, '-m' flag used but no valid columns selected.\n";
+			usage();
+		}
+		print STDERR "columns requested from second file to be appended to first file on match: '@COLUMNS_MERGE'\n" if ( $opt{'d'} and $opt{'m'} );
+	}
+	
 	my $sentence = <>;
 	# legal tokens are 'and', 'or', 'not', 'AND', 'OR', or 'NOT' <file name>.
 	my @tokens   = split( /\s/, $sentence );
@@ -192,8 +231,10 @@ sub sOr
 	return $tmp;
 }
 
-# Returns a list of uniq items that are in LHS or RHS.
-# param:  
+# Returns a list of lines that appear in both the left hand hash reference AND 
+# the right hand hash reference.
+# param:  tmp_lhs the left hand hash reference of comparison.
+# param:  tmp_rhs the right hand hash reference of comparison.  
 # return: list of items.
 sub sAnd
 {
@@ -201,13 +242,25 @@ sub sAnd
 	my $tmp = {};
 	while( my ($key, $v) = each %$tmp_lhs )
 	{
-		$tmp->{ $key } = $v if ( $tmp_lhs->{ $key } and $tmp_rhs->{ $key } );
+		if ( $opt{'m'} )
+		{
+			if ( $tmp_lhs->{ $key } and $tmp_rhs->{ $key } )
+			{
+				chomp( $v );
+				$tmp->{ $key } = $v . getColumns( $tmp_rhs->{ $key }, @COLUMNS_MERGE ) . "\n";
+			}
+		}
+		else
+		{
+			$tmp->{ $key } = $v if ( $tmp_lhs->{ $key } and $tmp_rhs->{ $key } );
+		}
 	}
 	return $tmp;
 }
 
 # Could have named this better, but returns a list of items from LHS that are not in RHS
-# param:  
+# param:  tmp_lhs the left hand hash reference of comparison.
+# param:  tmp_rhs the right hand hash reference of comparison.
 # return: list of items.
 sub sNot
 {
