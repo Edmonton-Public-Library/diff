@@ -394,12 +394,12 @@ sub parse
 		}
 		else
 		{
-			printf STDERR "Syntax error: unrecognized token '%s'.\n", $token;
+			printf STDERR "** Syntax error: unrecognized token '%s'.\n", $token;
 			exit( 0 );
 		}
 	}
-	printf STDERR "Syntax error: incomplete expression '%s'\n", @token;
-	exit( 0 );
+	printf STDERR "** Syntax error: incomplete expression.\n";
+	usage();
 }
 
 # EOF
