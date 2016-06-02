@@ -29,6 +29,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.9.01 - Improved output through printf, and added tests for empty files before running.
 # Rev:     0.9 - Added -m to merge data from both matching lines on output -e, then -f in order.
 #                The matches are issued only once.
 # Rev:     0.8 - Added -n to normalize fields before comparison. By normalize I mean
@@ -48,10 +49,11 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION            = "0.9";
+my $VERSION            = "0.9.01";
 my @COLUMNS_WANTED_TOO = ();
 my @COLUMNS_WANTED_ONE = ();
 my @COLUMNS_MERGE      = (); # Desired columns to be merged when file 1 and file 2 match.
+my $ALREADY_WARNED     = 0;
 
 #
 # Message about this program and how to use it
@@ -123,10 +125,10 @@ sub init
 		}
 		if ( scalar(@COLUMNS_WANTED_ONE) == 0 )
 		{
-			print STDERR "***Error, '-e' flag used but no valid columns selected.\n";
+			printf STDERR "** Error, '-e' flag used but no valid columns selected.\n";
 			usage();
 		}
-		print STDERR "columns requested from first file: '@COLUMNS_WANTED_ONE'\n" if ( $opt{'d'} and $opt{'e'} );
+		printf STDERR "columns requested from first file: '%d'\n", @COLUMNS_WANTED_ONE if ( $opt{'d'} and $opt{'e'} );
 	}
 	
 	if ( $opt{'f'} )
@@ -146,10 +148,10 @@ sub init
 		}
 		if ( scalar @COLUMNS_WANTED_TOO == 0 )
 		{
-			print STDERR "***Error, '-f' flag used but no valid columns selected.\n";
+			printf STDERR "***Error, '-f' flag used but no valid columns selected.\n";
 			usage();
 		}
-		print STDERR "columns requested from second file: '@COLUMNS_WANTED_TOO'\n" if ( $opt{'d'} and $opt{'f'} );
+		printf STDERR "columns requested from second file: '%d'\n", @COLUMNS_WANTED_TOO if ( $opt{'d'} and $opt{'f'} );
 	}
 	
 	if ( $opt{'m'} )
@@ -169,10 +171,10 @@ sub init
 		}
 		if ( scalar @COLUMNS_MERGE == 0 )
 		{
-			print STDERR "***Error, '-m' flag used but no valid columns selected.\n";
+			printf STDERR "***Error, '-m' flag used but no valid columns selected.\n";
 			usage();
 		}
-		print STDERR "columns requested from second file to be appended to first file on match: '@COLUMNS_MERGE'\n" if ( $opt{'d'} and $opt{'m'} );
+		printf STDERR "columns requested from second file to be appended to first file on match: '%d'\n", @COLUMNS_MERGE if ( $opt{'d'} and $opt{'m'} );
 	}
 	
 	my $sentence = <>;
@@ -181,7 +183,7 @@ sub init
 	my $lhs = parse( @tokens );
 	while( my ($key, $v) = each %$lhs )
 	{
-		print $v if ( defined $lhs->{$key} );
+		printf "%s", $v if ( defined $lhs->{$key} );
 	}
 }
 
@@ -282,13 +284,13 @@ sub doOperation
 	my ( $lhs, $operation, $rhs ) = @_;
 	if ( keys %$lhs == 0 or keys %$rhs == 0 )
 	{
-		print STDERR "can't complete operation; missing right hand value of operator '$operation'\n";
-		exit( 0 );
+		printf STDERR "* warning: either lhs or rhs contains no values, in doOperation() '%s'. Is either input file empty?\n", $operation if ( $opt{'d'} and ! $ALREADY_WARNED );
+		$ALREADY_WARNED++;
 	}
 	return sNot( $lhs, $rhs ) if ( $operation eq "NOT");
 	return sAnd( $lhs, $rhs ) if ( $operation eq "AND");
 	return sOr( $lhs, $rhs )  if ( $operation eq "OR" );
-	print STDERR "Unknown operation '$operation'\n";
+	printf STDERR "Unknown operation '%s'\n", $operation;
 	exit( 0 );
 }
 
@@ -309,7 +311,7 @@ sub getColumns
 	}
 	$line = join( '|', @newLine );
 	$line .= "|" if ( $opt{'t'} );
-	print STDERR ">$line<, " if ( $opt{'d'} );
+	printf STDERR ">%s<, ", $line if ( $opt{'d'} );
 	return $line;
 }
 
@@ -334,21 +336,22 @@ sub parse
 	while ( @tokens )
 	{
 		my $token = shift( @tokens );
+		$token = trim( $token ); # Allows the user to include extra spaces on STDIN.
 		if ( $token eq "or" or $token eq "OR" ) # only on FILE or after CLOSE_PAREN
 		{
-			print STDERR "or: '$token'\n" if ( $opt{'d'} );
+			printf STDERR "or: '%s'\n", $token if ( $opt{'d'} );
 			$operator = "OR";
 			next;
 		}
 		elsif ( $token eq "and" or $token eq "AND" ) # only on FILE or after CLOSE_PAREN
 		{
-			print STDERR "and: '$token'\n" if ( $opt{'d'} );
+			printf STDERR "and: '%s'\n", $token if ( $opt{'d'} );
 			$operator = "AND";
 			next;
 		}
 		elsif ( $token eq "not" or $token eq "NOT" ) # only on FILE or after CLOSE_PAREN
 		{
-			print STDERR "not: '$token'\n" if ( $opt{'d'} );
+			printf STDERR "not: '%s'\n", $token if ( $opt{'d'} );
 			$operator = "NOT";
 			next;
 		}
@@ -364,7 +367,7 @@ sub parse
 		# }
 		elsif ( -T $token ) # the token looks like a text file.
 		{
-			print STDERR "file: '$token'\n" if ( $opt{'d'} );
+			printf STDERR "file: '%s'\n", $token if ( $opt{'d'} );
 			open( FILE_IN, "<$token" ) or die "Error reading '$token': $!\n";
 			if ( keys %$lhs == 0 )
 			{
@@ -391,11 +394,11 @@ sub parse
 		}
 		else
 		{
-			print STDERR "Syntax error: unrecognized token '$token'.\n";
+			printf STDERR "Syntax error: unrecognized token '%s'.\n", $token;
 			exit( 0 );
 		}
 	}
-	print STDERR "Syntax error: incomplete expression '@tokens'\n";
+	printf STDERR "Syntax error: incomplete expression '%s'\n", @token;
 	exit( 0 );
 }
 
