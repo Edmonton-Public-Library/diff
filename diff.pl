@@ -29,6 +29,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.9.02 - Improved documentation about 'OR'.
 # Rev:     0.9.01 - Improved output through printf, and added tests for empty files before running.
 # Rev:     0.9 - Added -m to merge data from both matching lines on output -e, then -f in order.
 #                The matches are issued only once.
@@ -49,7 +50,7 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION            = "0.9.01";
+my $VERSION            = "0.9.02";
 my @COLUMNS_WANTED_TOO = ();
 my @COLUMNS_WANTED_ONE = ();
 my @COLUMNS_MERGE      = (); # Desired columns to be merged when file 1 and file 2 match.
@@ -65,7 +66,7 @@ sub usage()
 	usage: [echo "f1.txt <operator> f2.txt" |] $0 [-xdiot] [-e<c0,c1,...,cn> [-f<c0,c1,...,cn>]] [-m<c0,c1,...,cn>]
 This script allows the user to specify differences in files by boolean algerbra. 
 Note: '-f' uses 0-based column indexing. Example: a|b|c 'a' is column 0, 'b' is column 1.
-Example: echo "file1.txt or  file2.txt" | diff.pl would output the contents of both files.
+Example: echo "file1.txt or  file2.txt" | diff.pl outputs a list of values that appear in file 1 or file 2.
 Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match both files.
          echo "file1.txt not file2.txt" | diff.pl outputs lines from file1.txt that are not in file2.txt
  -d             : Print debug information.
@@ -95,6 +96,18 @@ example: Consider two files m1 and m2, where the contents of m1 reads:
          echo "m1 and m2" | $0 -ec0,c1 -fc0,c1 -mc2 
         Produces:
 11111|CD|5|24|
+example:
+         Condsider two files file_1 contains:
+ B|or1
+ A|or1
+         file_2 contains:
+ A|or2
+ C|or2
+         echo "file_1 or file_2" | diff.pl -ec0 -fc0
+ C|or2  # exists in file_1 (false) or exists in file_2 (true) then file_2's value output.
+ B|or1  # exists in file_1 (true) then file_1's value output, test succeeds and test exits before testing file_2.
+ A|or1  # exists in file_1 (true) then file_1's value output, test succeeds and test exits before testing file_2.
+ 
 Version: $VERSION
 EOF
     exit;
@@ -215,18 +228,22 @@ sub trim( $ )
 
 init();
 
-# Returns a list of items anded from LHS and RHS.
-# param:  
-# return: list of items.
+# Returns a list of items or'ed from LHS and RHS. Test if the value is in the first list
+# pick it, otherwise pick the item from the second list. 
+# param:  Left hand hash of key value pairs.
+# param:  Right hand hash of key value pairs.
+# return: hashmap of items from left side or items from right.
 sub sOr
 {
 	my ( $tmp_lhs, $tmp_rhs ) = @_;
 	my $tmp = {};
-	while( my ($key, $v) = each %$tmp_lhs )
+	# Load the hash with values from the second list, then over-write them with values from the first list
+	# This will be the equiv. of value in first list (false), then value in first list (true).
+	while( my ($key, $v) = each %$tmp_rhs )
 	{
 		$tmp->{ $key } = $v;
 	}
-	while( my ($key, $v) = each %$tmp_rhs )
+	while( my ($key, $v) = each %$tmp_lhs )
 	{
 		$tmp->{ $key } = $v;
 	}
