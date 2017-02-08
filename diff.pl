@@ -29,6 +29,9 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.9.04 - Fix bug where trailing delimiter fails to match column value.
+#                 a809658  AND a809658|(OCoLC)320195792 Passes
+#                 a809658| AND a809658|(OCoLC)320195792 Fails
 # Rev:     0.9.03 - Bug fixes. Multiple spaces break parsing.
 # Rev:     0.9.02 - Improved documentation about 'OR'.
 # Rev:     0.9.01 - Improved output through printf, and added tests for empty files before running.
@@ -51,7 +54,7 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION            = "0.9.03";
+my $VERSION            = "0.9.04";
 my @COLUMNS_WANTED_TOO = ();
 my @COLUMNS_WANTED_ONE = ();
 my @COLUMNS_MERGE      = (); # Desired columns to be merged when file 1 and file 2 match.
@@ -64,13 +67,14 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: [echo "f1.txt <operator> f2.txt" |] $0 [-xdiot] [-e<c0,c1,...,cn> [-f<c0,c1,...,cn>]] [-m<c0,c1,...,cn>]
+	usage: [echo "f1.txt <operator> f2.txt" |] $0 [-dDiotx] [-e<c0,c1,...,cn> [-f<c0,c1,...,cn>]] [-m<c0,c1,...,cn>]
 This script allows the user to specify differences in files by boolean algerbra. 
 Note: '-f' uses 0-based column indexing. Example: a|b|c 'a' is column 0, 'b' is column 1.
 Example: echo "file1.txt or  file2.txt" | diff.pl outputs a list of values that appear in file 1 or file 2.
 Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match both files.
          echo "file1.txt not file2.txt" | diff.pl outputs lines from file1.txt that are not in file2.txt
  -d             : Print debug information.
+ -D             : Places a delimiter between match and merge value if -m is used.
  -i             : Ignore letter casing.
  -e[c0,c1,...cn]: Columns from file 1 used in comparison. If the columns doesn't exist it is ignored.
  -f[c0,c1,...cn]: Columns from file 2 used in comparison. If the columns doesn't exist it is ignored.
@@ -119,7 +123,7 @@ EOF
 # return: 
 sub init
 {
-    my $opt_string = 'de:f:im:notx';
+    my $opt_string = 'dDe:f:im:notx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 	if ( $opt{'e'} )
@@ -267,7 +271,14 @@ sub sAnd
 			if ( $tmp_lhs->{ $key } and $tmp_rhs->{ $key } )
 			{
 				chomp( $v );
-				$tmp->{ $key } = $v . getColumns( $tmp_rhs->{ $key }, @COLUMNS_MERGE ) . "\n";
+				if ( $opt{'D'} and $v !~ m/\|$/ )
+				{
+					$tmp->{ $key } = $v . "|" . getColumns( $tmp_rhs->{ $key }, @COLUMNS_MERGE ) . "\n";
+				}
+				else
+				{
+					$tmp->{ $key } = $v . getColumns( $tmp_rhs->{ $key }, @COLUMNS_MERGE ) . "\n";
+				}
 			}
 		}
 		else
@@ -321,11 +332,15 @@ sub getColumns
 	my $line = shift;
 	my @wantedColumns = @_;
 	my @columns = split( '\|', $line );
-	return $line if ( scalar( @columns ) < 2 );
 	my @newLine = ();
 	foreach my $i ( @wantedColumns )
 	{
-		push( @newLine, $columns[ $i ] ) if ( defined $columns[ $i ] and exists $columns[ $i ] );
+		my $value = $columns[ $i ];
+		if ( defined $value && $value )
+		{
+			chomp( $value );
+			push( @newLine, $value );
+		}
 	}
 	$line = join( '|', @newLine );
 	$line .= "|" if ( $opt{'t'} );
