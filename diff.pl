@@ -29,6 +29,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.9.03 - Bug fixes. Multiple spaces break parsing.
 # Rev:     0.9.02 - Improved documentation about 'OR'.
 # Rev:     0.9.01 - Improved output through printf, and added tests for empty files before running.
 # Rev:     0.9 - Added -m to merge data from both matching lines on output -e, then -f in order.
@@ -50,7 +51,7 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-my $VERSION            = "0.9.02";
+my $VERSION            = "0.9.03";
 my @COLUMNS_WANTED_TOO = ();
 my @COLUMNS_WANTED_ONE = ();
 my @COLUMNS_MERGE      = (); # Desired columns to be merged when file 1 and file 2 match.
@@ -192,7 +193,7 @@ sub init
 	
 	my $sentence = <>;
 	# legal tokens are 'and', 'or', 'not', 'AND', 'OR', or 'NOT' <file name>.
-	my @tokens   = split( /\s/, $sentence );
+	my @tokens   = split( /\s+/, $sentence );
 	my $lhs = parse( @tokens );
 	while( my ($key, $v) = each %$lhs )
 	{
@@ -354,19 +355,19 @@ sub parse
 	{
 		my $token = shift( @tokens );
 		$token = trim( $token ); # Allows the user to include extra spaces on STDIN.
-		if ( $token eq "or" or $token eq "OR" ) # only on FILE or after CLOSE_PAREN
+		if ( $token =~ m/^or$/i ) # only on FILE or after CLOSE_PAREN
 		{
 			printf STDERR "or: '%s'\n", $token if ( $opt{'d'} );
 			$operator = "OR";
 			next;
 		}
-		elsif ( $token eq "and" or $token eq "AND" ) # only on FILE or after CLOSE_PAREN
+		elsif ( $token =~ m/^and$/i ) # only on FILE or after CLOSE_PAREN
 		{
 			printf STDERR "and: '%s'\n", $token if ( $opt{'d'} );
 			$operator = "AND";
 			next;
 		}
-		elsif ( $token eq "not" or $token eq "NOT" ) # only on FILE or after CLOSE_PAREN
+		elsif ( $token =~ m/^not$/i ) # only on FILE or after CLOSE_PAREN
 		{
 			printf STDERR "not: '%s'\n", $token if ( $opt{'d'} );
 			$operator = "NOT";
