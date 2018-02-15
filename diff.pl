@@ -29,6 +29,7 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Date:    September 10, 2012
+# Rev:     0.9.04 - Update usage message.
 # Rev:     0.9.04 - Fix bug where trailing delimiter fails to match column value.
 #                 a809658  AND a809658|(OCoLC)320195792 Passes
 #                 a809658| AND a809658|(OCoLC)320195792 Fails
@@ -78,8 +79,8 @@ Example: echo "file1.txt and file2.txt" | diff.pl would output lines that match 
  -i             : Ignore letter casing.
  -e[c0,c1,...cn]: Columns from file 1 used in comparison. If the columns doesn't exist it is ignored.
  -f[c0,c1,...cn]: Columns from file 2 used in comparison. If the columns doesn't exist it is ignored.
- -m[c0,c1,...cn]: Merge specified columns from file 2 where diff matches file 1 AND file 2.
-                  works on 'AND' operations, since you cannot merge fields that don't match.
+ -m[c0,c1,...cn]: Merge specified columns from file 2 where diff matches file 1 AND/OR file 2.
+                  works on 'AND' and 'OR' operations.
  -n             : Normalize fields before comparison, that is, remove all white space and make upper case.
                   ie: 'n  123A7000   ' becomes 'N123A7000'.
  -o             : Order all input file contents first.
